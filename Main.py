@@ -1,100 +1,105 @@
-#!/bin/bash
+import os, time, requests, json
 
-# COLOR CODES
-RED='\033[0;31m'
-GRN='\033[0;32m'
-YLW='\033[1;33m'
-CYA='\033[0;36m'
-RST='\033[0m'
+# ANSI COLORS
+RED = "\033[31m"
+GRN = "\033[32m"
+YLW = "\033[33m"
+CYA = "\033[36m"
+RST = "\033[0m"
 
-clear
+os.system("clear")
 
-echo -e "${RED}"
-echo "                 ███████████████████████████████████"
-echo "                 █────█────█────█────█────█────█───█"
-echo "                 █ Skull-Based IP Tracking System █"
-echo "                 █────█────█────█────█────█────█───█"
-echo "                 ███████████████████████████████████"
-echo -e "${RST}"
+# SKULL ASCII
+print(RED + """
+                 ███████████████████████████████████
+                 █────█────█────█────█────█────█───█
+                 █   SKULL-BASED IP RECON SYSTEM   █
+                 █────█────█────█────█────█────█───█
+                 ███████████████████████████████████
 
-sleep 1
+                        ▄▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▄
+                      ▄▀██████████████████▀▄
+                     ████████████████████████
+                    ██████████████████████████
+                    ███████▀    ▀███▀    ▀████
+                    ██████   ▄▀▀▄   ▄▀▀▄   ████
+                    ██████   ▀▀▀▀   ▀▀▀▀   ████
+                    ███████▄           ▄███████
+                     ████████████████████████
+                      ▀████████████████████▀
+                         ▀▀████████████▀▀
+""" + RST)
 
-echo -e "${RED}"
-echo "                        ▄▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▄"
-echo "                      ▄▀██████████████████▀▄"
-echo "                     ████████████████████████"
-echo "                    ██████████████████████████"
-echo "                    ███████▀    ▀███▀    ▀████"
-echo "                    ██████   ▄▀▀▄   ▄▀▀▄   ████"
-echo "                    ██████   ▀▀▀▀   ▀▀▀▀   ████"
-echo "                    ███████▄           ▄███████"
-echo "                     ████████████████████████"
-echo "                      ▀████████████████████▀"
-echo "                         ▀▀████████████▀▀"
-echo -e "${RST}"
+print(YLW + "Author: Act" + RST)
+time.sleep(1)
 
-sleep 1
+# LOADING SEQUENCE
+seq = [
+    "[ SYSTEM INITIALIZING ]",
+    "[ LOADING CORE MODULES ]",
+    "[ ESTABLISHING ROUTING NODES ]",
+    "[ ENGAGING DEEP SCAN ]"
+]
 
-echo -e "${YLW}Author = Act${RST}"
-echo
-sleep 1
+for s in seq:
+    print(RED + s + RST)
+    time.sleep(0.9)
 
-echo -e "${RED}[ SYSTEM INITIALIZING ]${RST}"
-sleep 1
-echo -e "${RED}[ LOADING MODULES . . . ]${RST}"
-sleep 1
-echo -e "${RED}[ ESTABLISHING CONNECTION TO NETWORK NODES ]${RST}"
-sleep 1
-echo
+print()
 
-read -p "Target IP: " IP
+# INPUT
+ip = input(YLW + "Target IP: " + RST)
 
-if [ -z "$IP" ]; then
-    echo -e "${RED}[ ERROR ] No IP entered.${RST}"
-    exit 1
-fi
+if ip.strip() == "":
+    print(RED + "No IP entered. Exiting." + RST)
+    exit()
 
-echo
-echo -e "${YLW}Engaging Deep Scan Mode...${RST}"
-sleep 1
-echo -e "${CYA}Locating target across global network grids...${RST}"
-sleep 1
-echo -e "${RED}Compiling geolocation layers...${RST}"
-sleep 1
-echo -e "${GRN}Extracting ISP, Organization, and Node Routes...${RST}"
-sleep 1
-echo
+print()
+print(CYA + "Locating target across global grids..." + RST)
+time.sleep(1)
+print(RED + "Compiling geolocation layers..." + RST)
+time.sleep(1)
+print(GRN + "Extracting ISP / Organization / Timezone..." + RST)
+time.sleep(1)
+print()
 
-data=$(curl -s https://ipinfo.io/$IP/json)
+# FETCH INFO
+try:
+    data = requests.get(f"https://ipinfo.io/{ip}/json").json()
+except:
+    print(RED + "Connection error. Cannot fetch data." + RST)
+    exit()
 
-ip=$(echo $data | jq -r '.ip')
-city=$(echo $data | jq -r '.city')
-region=$(echo $data | jq -r '.region')
-country=$(echo $data | jq -r '.country')
-loc=$(echo $data | jq -r '.loc')
-org=$(echo $data | jq -r '.org')
-tz=$(echo $data | jq -r '.timezone')
-postal=$(echo $data | jq -r '.postal')
+ip_addr = data.get("ip", "N/A")
+city = data.get("city", "N/A")
+region = data.get("region", "N/A")
+country = data.get("country", "N/A")
+loc = data.get("loc", "N/A")
+org = data.get("org", "N/A")
+postal = data.get("postal", "N/A")
+timezone = data.get("timezone", "N/A")
 
-echo -e "${RED}=========================================================${RST}"
-echo -e "${GRN}                TARGET DATA DECODED${RST}"
-echo -e "${RED}=========================================================${RST}"
-echo -e "${YLW} IP Address          : ${CYA}$ip${RST}"
-echo -e "${YLW} Country             : ${CYA}$country${RST}"
-echo -e "${YLW} Region              : ${CYA}$region${RST}"
-echo -e "${YLW} City                : ${CYA}$city${RST}"
-echo -e "${YLW} Postal Code         : ${CYA}$postal${RST}"
-echo -e "${YLW} Time Zone           : ${CYA}$tz${RST}"
-echo -e "${YLW} Organization        : ${CYA}$org${RST}"
-echo -e "${YLW} Coordinates         : ${CYA}$loc${RST}"
-echo -e "${RED}=========================================================${RST}"
-echo
+# OUTPUT
+print(RED + "=========================================================" + RST)
+print(GRN + "                TARGET DATA DECODED" + RST)
+print(RED + "=========================================================" + RST)
 
-sleep 1
-echo -e "${CYA}Generating location grid reference link...${RST}"
-sleep 1
-echo "https://maps.google.com/?q=$loc"
-echo
-sleep 1
+print(YLW + " IP Address          : " + CYA + ip_addr + RST)
+print(YLW + " Country             : " + CYA + country + RST)
+print(YLW + " Region              : " + CYA + region + RST)
+print(YLW + " City                : " + CYA + city + RST)
+print(YLW + " Postal Code         : " + CYA + postal + RST)
+print(YLW + " Time Zone           : " + CYA + timezone + RST)
+print(YLW + " Organization        : " + CYA + org + RST)
+print(YLW + " Coordinates         : " + CYA + loc + RST)
 
-echo -e "${RED}[ PROCESS COMPLETE ]${RST}"
+print(RED + "=========================================================" + RST)
+print()
+
+time.sleep(1)
+print(CYA + "Generated Google Maps link:" + RST)
+print("https://maps.google.com/?q=" + loc)
+print()
+time.sleep(1)
+
+print(RED + "[ PROCESS COMPLETE ]" + RST)
