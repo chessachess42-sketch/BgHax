@@ -1,95 +1,58 @@
+#!/usr/bin/env python3
+
 import requests
 import os
 import time
-import sys
 
-CYAN  = "\033[96m"
 GREEN = "\033[92m"
+CYAN = "\033[96m"
 RESET = "\033[0m"
-RED   = "\033[91m"
-
-def clear():
-    os.system("clear")
-
-def slow(text, delay=0.02):
-    for char in text:
-        sys.stdout.write(char)
-        sys.stdout.flush()
-        time.sleep(delay)
-    print()
 
 def banner():
-    print(CYAN + "==============================================")
-    print("        ███╗   ██╗ █████╗  ████████╗")
-    print("        ████╗  ██║██╔══██╗ ╚══██╔══╝")
-    print("        ██╔██╗ ██║███████║    ██║   ")
-    print("        ██║╚██╗██║██╔══██║    ██║   ")
-    print("        ██║ ╚████║██║  ██║    ██║   ")
-    print("        ╚═╝  ╚═══╝╚═╝  ╚═╝    ╚═╝   ")
-    print("==============================================" + RESET)
-    print(GREEN + "            IP INFORMATION TRACKER\n" + RESET)
-
-def loading():
-    for i in range(3):
-        sys.stdout.write(GREEN + "[*] Loading" + "." * (i+1) + "   \r")
-        sys.stdout.flush()
-        time.sleep(0.4)
-    print(RESET)
-
-def get_ip():
-    try:
-        loading()
-        ip = requests.get("https://api.ipify.org").text
-        return ip
-    except:
-        return None
-
-def lookup(ip):
-    try:
-        url = f"https://ipapi.co/{ip}/json/"
-        return requests.get(url).json()
-    except:
-        return None
-
-def show_info(info):
-    print(CYAN + "\n------------ RESULTS ------------" + RESET)
-    for key, val in info.items():
-        print(f"{GREEN}{key}: {CYAN}{val}{RESET}")
-    print(CYAN + "----------------------------------" + RESET)
-
-def menu():
-    print(GREEN + "\n[1] Lookup your own IP")
+    os.system("clear")
+    print(GREEN + r"""
+ _   _    _    _____ 
+| \ | |  / \  |_   _|
+|  \| | / _ \   | |  
+| |\  |/ ___ \  | |  
+|_| \_/_/   \_\ |_|  
+""" + RESET)
+    print(CYAN + " IP INFORMATION TRACKER" + RESET)
+    print()
+    print(GREEN + "[1] Lookup your own IP")
     print("[2] Lookup custom IP")
-    print("[3] Exit\n" + RESET)
+    print("[3] Exit" + RESET)
+    print()
 
-# Main Program
-clear()
-banner()
+def lookup(ip=None):
+    try:
+        url = "http://ip-api.com/json/" + (ip if ip else "")
+        data = requests.get(url).json()
+
+        print(GREEN + "\n--- IP INFORMATION ---\n" + RESET)
+        for k, v in data.items():
+            print(f"{GREEN}{k.upper():15}{RESET} : {v}")
+        print()
+    except:
+        print("Error fetching data!")
 
 while True:
-    menu()
+    banner()
     choice = input(GREEN + "Select option > " + RESET)
 
     if choice == "1":
-        ip = get_ip()
-        if ip is None:
-            print(RED + "Error fetching IP." + RESET)
-        else:
-            print(GREEN + f"\nYour IP: {CYAN}{ip}" + RESET)
-            info = lookup(ip)
-            show_info(info)
-
+        lookup()
+        input("\nPress Enter to continue...")
     elif choice == "2":
-        target = input(GREEN + "Enter IP address: " + RESET)
-        info = lookup(target)
-        if info:
-            show_info(info)
-        else:
-            print(RED + "Invalid IP or network error." + RESET)
-
+        custom = input(GREEN + "Enter IP address: " + RESET)
+        lookup(custom)
+        input("\nPress Enter to continue...")
     elif choice == "3":
-        slow(CYAN + "Exiting…" + RESET)
+        print(GREEN + "\nExiting..." + RESET)
+        time.sleep(1)
         break
-
     else:
-        print(RED + "Invalid choice!" + RESET)
+        print("Invalid choice!")
+        time.sleep(1)
+
+print(GREEN + "\nAuthor — Act" + RESET)
