@@ -18,6 +18,7 @@ def banner():
 |_| \_/_/   \_\ |_|  
 """ + RESET)
     print(CYAN + " IP INFORMATION TRACKER" + RESET)
+    print(GREEN + " Author - Act" + RESET)
     print()
     print(GREEN + "[1] Lookup your own IP")
     print("[2] Lookup custom IP")
@@ -54,5 +55,3 @@ while True:
     else:
         print("Invalid choice!")
         time.sleep(1)
-
-print(GREEN + "\nAuthor — Act" + RESET)
