@@ -260,6 +260,4 @@ class OTGUnlocker:
                     self.success = True
                 elif status is False:
                     # PIN was incorrect
-                    print(f"PIN {pin} was incorrect")
-            else:
-                # Try PIN locally via
+                    print(f"PIN {pin}
