@@ -2,28 +2,48 @@ import requests
 import json
 import hashlib
 import time
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 
 class BlockmanGoAPI:
     """
-   Author- Act
+    Author- Act 
 
- A Python wrapper for interacting with the real Blockman Go API.
+A Python wrapper for interacting with the real Blockman Go API.
     This tool connects to the official Blockman Go API endpoints.
     """
     
-    def __init__(self, base_url: str = "https://gw.sandboxol.com"):
+    # Possible base URLs for Blockman Go API
+    POSSIBLE_BASE_URLS = [
+        "https://gw.sandboxol.com",
+        "https://api.blockmango.com",
+        "https://api.blockman-go.com",
+        "https://blockman-go.com/api",
+        "https://gw.blockmango.com",
+        "https://api.sandboxol.com",
+    ]
+    
+    # Possible endpoint patterns
+    POSSIBLE_ENDPOINT_PATTERNS = [
+        "{endpoint}",
+        "v1/{endpoint}",
+        "api/v1/{endpoint}",
+        "api/{endpoint}",
+        "blockman/{endpoint}",
+    ]
+    
+    def __init__(self, base_url: Optional[str] = None):
         """
         Initialize the API client.
         
         Args:
-            base_url: The base URL for the Blockman Go API
+            base_url: The base URL for the Blockman Go API (optional)
         """
-        self.base_url = base_url
+        self.base_url = base_url or self.POSSIBLE_BASE_URLS[0]
         self.session = requests.Session()
         self.user_id = None
         self.access_token = None
         self.device_id = None
+        self.working_endpoints = {}
     
     def set_auth(self, user_id: str, access_token: str, device_id: str = None) -> None:
         """
@@ -52,7 +72,7 @@ class BlockmanGoAPI:
     def _generate_sign(self, params: Dict) -> str:
         """
         Generate X-Sign header for API authentication.
-        This is required for some endpoints as mentioned in the search results.
+        This is required for some endpoints.
         
         Args:
             params: Parameters to include in the signature
@@ -67,6 +87,52 @@ class BlockmanGoAPI:
         sign_string = f"{self.access_token}{timestamp}{params_str}"
         return hashlib.md5(sign_string.encode()).hexdigest()
     
+    def discover_api_endpoints(self) -> Dict:
+        """
+        Try to discover the correct API endpoints by testing different patterns.
+        
+        Returns:
+            Dictionary of working endpoints
+        """
+        print("Discovering API endpoints...")
+        
+        # Common endpoints to test
+        test_endpoints = [
+            "server/list",
+            "game/list",
+            "user/info",
+            "news/list",
+        ]
+        
+        working_endpoints = {}
+        
+        for base_url in self.POSSIBLE_BASE_URLS:
+            print(f"Testing base URL: {base_url}")
+            
+            for endpoint in test_endpoints:
+                for pattern in self.POSSIBLE_ENDPOINT_PATTERNS:
+                    full_endpoint = pattern.format(endpoint=endpoint)
+                    url = f"{base_url}/{full_endpoint}"
+                    
+                    try:
+                        response = self.session.get(url, timeout=5)
+                        if response.status_code == 200:
+                            print(f"✓ Working endpoint found: {url}")
+                            working_endpoints[endpoint] = full_endpoint
+                            break
+                    except requests.exceptions.RequestException:
+                        pass
+                
+                # If we found a working endpoint for this base URL, assume it's the correct one
+                if endpoint in working_endpoints and working_endpoints[endpoint]:
+                    self.base_url = base_url
+                    self.working_endpoints = working_endpoints
+                    print(f"Using base URL: {base_url}")
+                    return working_endpoints
+        
+        print("Could not find working endpoints. You may need to provide the correct base URL.")
+        return {}
+    
     def get(self, endpoint: str, params: Optional[Dict] = None, require_sign: bool = False) -> Dict:
         """
         Send a GET request to the API.
@@ -79,6 +145,10 @@ class BlockmanGoAPI:
         Returns:
             The JSON response from the API
         """
+        # Use discovered endpoint pattern if available
+        if endpoint in self.working_endpoints:
+            endpoint = self.working_endpoints[endpoint]
+        
         url = f"{self.base_url}/{endpoint}"
         
         if require_sign and params:
@@ -103,6 +173,10 @@ class BlockmanGoAPI:
         Returns:
             The JSON response from the API
         """
+        # Use discovered endpoint pattern if available
+        if endpoint in self.working_endpoints:
+            endpoint = self.working_endpoints[endpoint]
+        
         url = f"{self.base_url}/{endpoint}"
         
         if require_sign and data:
@@ -115,15 +189,6 @@ class BlockmanGoAPI:
         response.raise_for_status()
         return response.json()
     
-    def get_user_info(self) -> Dict:
-        """
-        Get current user information.
-        
-        Returns:
-            User information as a dictionary
-        """
-        return self.get("v1/user/info")
-    
     def get_server_list(self) -> Dict:
         """
         Get the list of available servers.
@@ -131,7 +196,7 @@ class BlockmanGoAPI:
         Returns:
             Server list as a dictionary
         """
-        return self.get("v1/server/list")
+        return self.get("server/list")
     
     def get_game_list(self) -> Dict:
         """
@@ -140,49 +205,16 @@ class BlockmanGoAPI:
         Returns:
             Game list as a dictionary
         """
-        return self.get("v1/game/list")
+        return self.get("game/list")
     
-    def get_leaderboard(self, game_id: str, limit: int = 10) -> Dict:
+    def get_user_info(self) -> Dict:
         """
-        Get the leaderboard for a specific game.
+        Get current user information.
         
-        Args:
-            game_id: The ID of the game
-            limit: Maximum number of entries to return
-            
         Returns:
-            Leaderboard data as a dictionary
+            User information as a dictionary
         """
-        params = {"gameId": game_id, "limit": limit}
-        return self.get("v1/leaderboard", params)
-    
-    def get_room_info(self, room_id: str) -> Dict:
-        """
-        Get information about a specific room.
-        
-        Args:
-            room_id: The ID of the room
-            
-        Returns:
-            Room information as a dictionary
-        """
-        return self.get(f"v1/room/{room_id}")
-    
-    def join_room(self, room_id: str, password: Optional[str] = None) -> Dict:
-        """
-        Join a specific room.
-        
-        Args:
-            room_id: The ID of the room to join
-            password: Optional password if the room is private
-            
-        Returns:
-            Response as a dictionary
-        """
-        data = {"roomId": room_id}
-        if password:
-            data["password"] = password
-        return self.post("v1/room/join", data, require_sign=True)
+        return self.get("user/info")
     
     def get_news(self) -> Dict:
         """
@@ -191,45 +223,45 @@ class BlockmanGoAPI:
         Returns:
             News data as a dictionary
         """
-        return self.get("v1/news/list")
-    
-    def get_shop_items(self) -> Dict:
-        """
-        Get items from the shop.
-        
-        Returns:
-            Shop items data as a dictionary
-        """
-        return self.get("v1/shop/items")
+        return self.get("news/list")
 
 # Example usage
 if __name__ == "__main__":
-    # Initialize the API client with the official endpoint
+    # Initialize the API client
     api = BlockmanGoAPI()
     
     # If you have authentication credentials, uncomment the following line:
     # api.set_auth("your_user_id", "your_access_token", "your_device_id")
     
     try:
-        # Get server list
-        print("Server List:")
-        servers = api.get_server_list()
-        print(json.dumps(servers, indent=2))
+        # Try to discover working endpoints
+        working_endpoints = api.discover_api_endpoints()
         
-        # Get game list
-        print("\nGame List:")
-        games = api.get_game_list()
-        print(json.dumps(games, indent=2))
-        
-        # Get news
-        print("\nNews:")
-        news = api.get_news()
-        print(json.dumps(news, indent=2))
-        
-        # Get user info (if authenticated)
-        # print("\nUser Info:")
-        # user_info = api.get_user_info()
-        # print(json.dumps(user_info, indent=2))
-        
+        if working_endpoints:
+            # Get server list
+            print("\nServer List:")
+            servers = api.get_server_list()
+            print(json.dumps(servers, indent=2))
+            
+            # Get game list
+            print("\nGame List:")
+            games = api.get_game_list()
+            print(json.dumps(games, indent=2))
+            
+            # Get news
+            print("\nNews:")
+            news = api.get_news()
+            print(json.dumps(news, indent=2))
+            
+            # Get user info (if authenticated)
+            # print("\nUser Info:")
+            # user_info = api.get_user_info()
+            # print(json.dumps(user_info, indent=2))
+        else:
+            print("Could not find working endpoints. You may need to:")
+            print("1. Check the official Blockman Go app for the correct API endpoints")
+            print("2. Use a network traffic analyzer to capture the actual API calls")
+            print("3. Provide the correct base URL manually")
+            
     except requests.exceptions.RequestException as e:
         print(f"Error making API request: {e}")
